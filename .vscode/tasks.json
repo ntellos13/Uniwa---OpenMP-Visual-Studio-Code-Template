@@ -8,17 +8,20 @@
             "type": "shell",
             "command": "make",
             "options": {
-                "cwd": "${workspaceFolder}/source",
+                "cwd": "${workspaceFolder}/source"
             },
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
             "presentation": {
-                "reveal":"always"
+                "reveal": "always"
             },
             "problemMatcher": [
                 "$gcc"
+            ],
+            "dependsOn":[
+                "clean"
             ]
         },
         {
@@ -26,8 +29,9 @@
             "type": "shell",
             "command": "make clean",
             "options": {
-                "cwd": "${workspaceFolder}/source",
-            }
+                "cwd": "${workspaceFolder}/source"
+            },
+            "problemMatcher": []
         }
     ]
 }
