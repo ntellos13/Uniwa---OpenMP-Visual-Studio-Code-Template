@@ -20,6 +20,11 @@ bool FileParser::TryParse(int**& out, int& length)
 {
     std::ifstream fileStream(this->filePath, std::ios::binary);
 
+    if(!fileStream)
+    {
+        return false;
+    }
+
     fileStream.seekg(0, std::ios::end);
     std::streampos _length = fileStream.tellg();
     fileStream.seekg(0, std::ios::beg);

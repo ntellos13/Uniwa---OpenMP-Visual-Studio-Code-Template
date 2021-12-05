@@ -13,7 +13,16 @@ bool CheckDiagonallyDominant(int**& matrix, int& length);
 
 int main(int argc, char *argv[])
 {
-    auto parser = FileParser("../../test.txt");
+    if(argc != 2)
+    {
+        cout << "Invalid process parameters" << endl;
+
+        return -1;
+    }
+
+    string path = argv[1];
+
+    auto parser = FileParser(path);
     int length = 0;
     int** matrix;
 
@@ -62,7 +71,7 @@ bool CheckDiagonallyDominantOMPParallelForWithCollapse(int**& matrix, int& lengt
     int diagonalValue;
     int sum;
 
-    #pragma omp parallel for collapse(2) private(diagonalValue, sum)
+    #pragma omp parallel for collapse(2) private(diagonalValue, sum) num_threads(8)
     for(auto i = 0; i < length; i++)
     {
         for(auto j = 0; j < length; j++)
