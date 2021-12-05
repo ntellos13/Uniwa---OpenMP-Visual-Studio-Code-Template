@@ -4,12 +4,49 @@
 #include "FileParser.hpp"
 #include "SquareMatrixConsoleLogger.hpp"
 #include "Timer.hpp"
+#include <cmath>
+#include <limits>
 
 using namespace std;
+
+struct Lambda 
+{
+    // int(*generator)(int**& matrix, int i, int j)
+    template<typename TReturn, typename T>
+    static TReturn lambda_ptr_exec(int**& matrix, int i, int j)
+    {
+        return (TReturn) (*(T*)fn<T>())(matrix, i, j);
+    }
+
+    template<typename TReturn = void, typename TemplateFunctionPointer = TReturn(*)(int**& matrix, int i, int j), typename T>
+    static TemplateFunctionPointer ptr(T& t) 
+    {
+        fn<T>(&t);
+        
+        return (TemplateFunctionPointer) lambda_ptr_exec<TReturn, T>;
+    }
+
+    template<typename T>
+    static void* fn(void* new_fn = nullptr) 
+    {
+        static void* fn;
+
+        if (new_fn != nullptr)
+        {
+            fn = new_fn;
+        }
+
+        return fn;
+    }
+};
 
 bool CheckDiagonallyDominantOMPParallelForWithCollapse(int**& matrix, int& length);
 bool CheckDiagonallyDominantOMPParallelFor(int**& matrix, int& length);
 bool CheckDiagonallyDominant(int**& matrix, int& length);
+int FindAbsoluteLargestDiagonalElement(int**& matrix, int& length);
+bool TryGenerateNewMatrix(int**& matrix, int& length, int**& out, int(*generator)(int**& matrix, int i, int j));
+int GetMinimumWithReduction(int**& matrix, int& length);
+int GetMinimumWithCritical(int**& matrix, int& length);
 
 int main(int argc, char *argv[])
 {
@@ -60,6 +97,46 @@ int main(int argc, char *argv[])
     cout << "Computed matrix diagonal dominance (Parallel with collapse) in " << timer.Elapsed() << " ms." << endl;
 
     cout << (isDiagonallyDominant ? "Input matrix is diagonally dominant" : "Input matrix is not diagonally dominant") << endl;
+
+    if(isDiagonallyDominant)
+    {
+        timer = Timer();
+
+        int maxDiagnoalElement = FindAbsoluteLargestDiagonalElement(matrix, length);
+
+        cout << "Maximum diagonal Element: " << maxDiagnoalElement << ". Computed in " << timer.Elapsed() << " ms." << endl;
+
+        auto func = [&] (int**& __matrix, int i, int j) 
+        {
+            return i == j
+                ? maxDiagnoalElement
+                : maxDiagnoalElement - std::abs(__matrix[i][j]); 
+        };
+
+        timer = Timer();
+
+        int** newMatrix;
+        if(!TryGenerateNewMatrix(matrix, length, newMatrix, Lambda::ptr<int>(func)))
+        {
+            cout << "Oops. Something went wrong!" << endl;
+            
+            return -1;
+        }
+
+        cout << "New matrix generated in " << timer.Elapsed() << " ms." << endl;
+
+        timer = Timer();
+
+        int min = GetMinimumWithReduction(newMatrix, length);
+
+        cout << "Computed minimum matrix Element (Reduction): " << min << ". Computed in " << timer.Elapsed() << " ms." << endl;
+
+        timer = Timer();
+
+        min = GetMinimumWithCritical(newMatrix, length);
+
+        cout << "Computed minimum matrix Element (OMP Critical): " << min << ". Computed in " << timer.Elapsed() << " ms." << endl;
+    }
 
     return 0;
 }
@@ -178,4 +255,77 @@ bool CheckDiagonallyDominant(int**& matrix, int& length)
     }
 
     return flag;
+}
+
+int FindAbsoluteLargestDiagonalElement(int**& matrix, int& length)
+{
+    int result = 0;
+
+    #pragma omp parallel for reduction(max:result)
+    for(auto i = 0; i < length; i++)
+    {
+        result = max(result, std::abs(matrix[i][i]));
+    }
+
+    return result;
+}
+
+int GetMinimumWithReduction(int**& matrix, int& length)
+{
+    int result = std::numeric_limits<int>::max();
+
+    #pragma omp parallel for collapse(2) reduction(min:result)
+    for(auto i = 0; i < length; i++)
+    {
+        for(auto j = 0; j < length; j++)
+        {
+            result = min(result, matrix[i][j]);
+        }
+    }
+
+    return result;
+}
+
+int GetMinimumWithCritical(int**& matrix, int& length)
+{
+    int result = std::numeric_limits<int>::max();
+
+    #pragma omp parallel for collapse(2) reduction(min:result)
+    for(auto i = 0; i < length; i++)
+    {
+        for(auto j = 0; j < length; j++)
+        {
+            if(matrix[i][j] < result)
+            {
+                #pragma omp critical
+                result = matrix[i][j];
+            }
+        }
+    }
+
+    return result;
+}
+
+bool TryGenerateNewMatrix(int**& matrix, int& length, int**& out, int(*generator)(int**& matrix, int i, int j))
+{
+    auto result = new int*[length];
+
+    #pragma omp parallel for
+    for(auto i = 0; i < length; i++)
+    {
+        result[i] = new int[length];
+    }
+
+    #pragma omp parallel for collapse(2)
+    for(auto i = 0; i < length; i++)
+    {
+        for(auto j = 0; j < length; j++)
+        {
+            result[i][j] = generator(matrix, i, j);
+        }
+    }
+
+    out = result;
+
+    return true;
 }

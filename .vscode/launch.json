@@ -12,6 +12,7 @@
             "args": [
                 "../../test.txt"
             ],
+            "envFile": "${workspaceFolder}/debug.env",
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/source/bin",
             "environment": [],
