@@ -71,6 +71,7 @@ bool CheckDiagonallyDominantOMPParallelForWithCollapse(int**& matrix, int& lengt
     int diagonalValue;
     int sum;
 
+    // this is not the optimal way, because length must be an integer multiple of num_threads.
     #pragma omp parallel for collapse(2) private(diagonalValue, sum) num_threads(8)
     for(auto i = 0; i < length; i++)
     {
