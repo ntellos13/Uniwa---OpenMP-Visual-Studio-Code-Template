@@ -5,6 +5,9 @@ BIN := openmp
 
 # source files
 SRCS := \
+	Timer.cpp \
+	FileParser.cpp \
+	SquareMatrixConsoleLogger.cpp \
     main.cpp
 
 # intermediate directory for generated object files
