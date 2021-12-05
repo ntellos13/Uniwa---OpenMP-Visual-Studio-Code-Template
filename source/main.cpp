@@ -6,6 +6,8 @@
 #include "Timer.hpp"
 #include <cmath>
 #include <limits>
+#include <iostream>
+#include <iterator>
 
 using namespace std;
 
@@ -47,6 +49,8 @@ int FindAbsoluteLargestDiagonalElement(int**& matrix, int& length);
 bool TryGenerateNewMatrix(int**& matrix, int& length, int**& out, int(*generator)(int**& matrix, int i, int j));
 int GetMinimumWithReduction(int**& matrix, int& length);
 int GetMinimumWithCritical(int**& matrix, int& length);
+int GetMinimumWithBinaryTree(int**& matrix, int& length);
+int GetMinimumWithBinaryTreeStep1(int**& matrix, int& length, int threadNum, int threadCount);
 
 int main(int argc, char *argv[])
 {
@@ -136,6 +140,12 @@ int main(int argc, char *argv[])
         min = GetMinimumWithCritical(newMatrix, length);
 
         cout << "Computed minimum matrix Element (OMP Critical): " << min << ". Computed in " << timer.Elapsed() << " ms." << endl;
+
+        timer = Timer();
+
+        min = GetMinimumWithBinaryTree(newMatrix, length);
+
+        cout << "Computed minimum matrix Element (BinaryTree): " << min << ". Computed in " << timer.Elapsed() << " ms." << endl;
     }
 
     return 0;
@@ -300,6 +310,74 @@ int GetMinimumWithCritical(int**& matrix, int& length)
                 #pragma omp critical
                 result = matrix[i][j];
             }
+        }
+    }
+
+    return result;
+}
+
+int GetMinimumWithBinaryTree(int**& matrix, int& length)
+{
+    int* results = nullptr;
+
+    #pragma omp parallel shared(results)
+    {
+        auto threadCount = omp_get_num_threads();
+        auto threadNum = omp_get_thread_num();
+        
+        // init results array and synchronize threads.
+        if(threadNum == 0)
+        {
+            results = new int[threadCount];
+        }
+
+        #pragma omp barrier
+
+        auto stepCount = (int)std::log2(threadCount);
+        
+        // execute different code based on binary tree level.
+        // First step: Each thread takes length / threadCount numbers, counts a local min and appends to results array.
+        // Other steps: Thread_X counts 
+        for(auto step = 0; step < stepCount; step++)
+        {
+            if(step == 0)
+            {
+                results[threadNum] = GetMinimumWithBinaryTreeStep1(matrix, length, threadNum, threadCount);
+            }
+            else
+            {
+                auto maxThread = threadCount >> step;
+
+                if(threadNum < maxThread)
+                {
+                    results[threadNum] = std::min(results[threadNum], results[maxThread + threadNum]);
+                }
+            }
+
+            #pragma omp barrier
+        }
+    }
+
+    return results[0];
+}
+
+int GetMinimumWithBinaryTreeStep1(int**& matrix, int& length, int threadNum, int threadCount)
+{
+    int result = std::numeric_limits<int>::max();
+    auto threadElements = threadNum < threadCount - 1 // is not last 
+        ? length / threadCount
+        : (length / threadCount) + (length % threadCount);
+    auto start = threadNum * threadElements;
+    auto end = (threadNum * threadElements) + threadElements;
+
+    for(auto x = start; x < end; x++)
+    {
+        auto i = x / length;
+        auto j = x % length;
+
+        if(matrix[i][j] < result)
+        {
+            result = matrix[i][j];
         }
     }
 
